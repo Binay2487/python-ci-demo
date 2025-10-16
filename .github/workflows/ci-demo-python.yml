@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.10', '3.11', '3.12']
+        python-version: [3.10, 3.11, 3.12]
     steps:
       # Checkout the repository
       - name: Checkout
@@ -29,20 +29,22 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}-${{ matrix.python-version }}
 
-      # Install dependencies
+      # Upgrade pip and install dependencies
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # Run pytest
+      # Set PYTHONPATH and run tests
       - name: Run tests
-        run: pytest --maxfail=1 --disable-warnings -q
+        run: |
+          export PYTHONPATH=$PYTHONPATH:$(pwd)
+          pytest --maxfail=1 --disable-warnings -q
 
-      # Run linter (flake8)
-      - name: Run linter
+      # Run linter
+      - name: Run linter (flake8)
         run: |
           python -m pip install flake8
           flake8 src tests || true
@@ -51,7 +53,7 @@ jobs:
     needs: build-test-lint
     runs-on: ubuntu-latest
     steps:
-      # Checkout the repo
+      # Checkout the repository
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -59,9 +61,9 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.15'
+          python-version: '3.10'
 
-      # Build and publish to PyPI (skipped if token is missing)
+      # Build and publish to PyPI if token is set
       - name: Build and publish
         if: ${{ github.ref == 'refs/heads/main' }}
         env:
