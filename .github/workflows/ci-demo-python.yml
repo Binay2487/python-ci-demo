@@ -53,7 +53,7 @@ jobs:
           flake8 src tests || true
 
   publish-pypi:
-    needs: build-test-lint
+    needs: build-test-lint-clean
     runs-on: ubuntu-latest
     steps:
       # Checkout the repository
