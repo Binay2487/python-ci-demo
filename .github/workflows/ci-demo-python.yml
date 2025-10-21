@@ -5,92 +5,70 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-  # Allows manual triggering from the GitHub UI
   workflow_dispatch:
 
 jobs:
   build-test-lint:
-    # Use a matrix strategy to test across multiple Python versions for wider compatibility
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        # Define the Python versions you want to test against
         python-version: ['3.9', '3.10', '3.11', '3.12']
-    
+
     steps:
-      # Checkout the repository
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Set up Python
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
-      # Cache pip dependencies
       - name: Cache pip
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          # Key now includes Python version to keep caches separate for each environment
           key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}-${{ matrix.python-version }}
           restore-keys: |
             ${{ runner.os }}-pip-
 
-      # Install dependencies (installing flake8 here simplifies the lint step later)
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          # Assuming `pytest` and `flake8` are now in requirements.txt for consistency
           pip install -r requirements.txt
 
-      # Run tests
       - name: Run tests
-        # Export PYTHONPATH so Python can find your local modules during testing
+        env:
+          PYTHONPATH: ${{ github.workspace }}
         run: |
-          echo "PYTHONPATH=$(pwd)" >> $GITHUB_ENV
-          # Using the same flags you provided for quiet, strict testing
-          pytest --maxfail=1 --disable-warnings -q
+          echo "Running tests with PYTHONPATH=${PYTHONPATH}"
+          python -m pytest --maxfail=1 --disable-warnings -q
 
-      # Run linter
       - name: Run linter (flake8)
-        # Note: The '|| true' has been removed. Linting should be mandatory for CI success.
         run: |
           flake8 src tests
 
   publish-pypi:
-    # Only run if the build/test job succeeded
     needs: build-test-lint
     runs-on: ubuntu-latest
-    # Only publish on pushes to the main branch
     if: ${{ github.ref == 'refs/heads/main' }}
-    
+
     steps:
-      # Checkout the repository
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Set up Python (fixed version for building)
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12' # Use the latest stable version for package building
+          python-version: '3.12'
 
-      # Install build and publishing tools
       - name: Install build tools
         run: |
           python -m pip install --upgrade pip build twine
 
-      # Build package distributions (sdist and wheel)
       - name: Build distributions
         run: python -m build
 
-      # Publish to PyPI using official action for security and simplicity
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
-        # The official action automatically handles TWINE_USERNAME and TWINE_PASSWORD using the provided token.
-        # It simplifies the manual token check and upload commands.
         with:
           password: ${{ secrets.PYPI_API_TOKEN }}
-          # The official action uploads files in `dist/` by default
